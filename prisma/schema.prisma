@@ -67,3 +67,11 @@ model Attendance {
   course     Course @relation(fields: [courseId], references: [id])
   supervisor User   @relation("SupervisorAttendance", fields: [supervisorId], references: [id])
 }
+
+model Story {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  authorName  String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
