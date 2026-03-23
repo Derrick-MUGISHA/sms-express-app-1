@@ -3,14 +3,26 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { body } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const prisma = require('../config/db');
 const { validate } = require('../middleware/validate');
 const { sendEmail } = require('../services/email.service');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Helper to hash refresh tokens
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+// Helper to hash OTPs
+const hashOtp = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 /**
  * @swagger
@@ -41,6 +53,7 @@ const hashToken = (token) => crypto.createHash('sha256').update(token).digest('h
  *         description: User registered successfully. OTP sent via email (expires in 5 minutes).
  */
 router.post('/register', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
@@ -61,7 +74,7 @@ router.post('/register',
           email, 
           password: hashedPassword,
           role: 'STUDENT',
-          otp,
+          otp: hashOtp(otp),
           otpExpires,
           isVerified: false
         }
@@ -77,7 +90,8 @@ router.post('/register',
 
       res.status(201).json({ message: 'User registered. Please check your email for the verification code.', userId: user.id });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Registration error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -105,6 +119,7 @@ router.post('/register',
  *         description: Invalid or expired OTP
  */
 router.post('/verify-email', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
@@ -115,7 +130,12 @@ router.post('/verify-email',
       const { email, otp } = req.body;
       const user = await prisma.user.findUnique({ where: { email } });
 
-      if (!user || user.otp !== otp || new Date() > user.otpExpires) {
+      if (!user || new Date() > user.otpExpires) {
+        return res.status(400).json({ error: 'Invalid or expired OTP' });
+      }
+
+      const providedHash = hashOtp(otp);
+      if (user.otp.length !== providedHash.length || !crypto.timingSafeEqual(Buffer.from(user.otp), Buffer.from(providedHash))) {
         return res.status(400).json({ error: 'Invalid or expired OTP' });
       }
 
@@ -126,7 +146,8 @@ router.post('/verify-email',
 
       res.json({ message: 'Email verified successfully. You can now log in.' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Email verification error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -152,6 +173,7 @@ router.post('/verify-email',
  *         description: Please wait for your previous OTP to expire (5 minutes) before requesting a new one
  */
 router.post('/resend-verification', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     validate
@@ -173,7 +195,7 @@ router.post('/resend-verification',
 
       await prisma.user.update({
         where: { email },
-        data: { otp, otpExpires }
+        data: { otp: hashOtp(otp), otpExpires }
       });
 
       await sendEmail(
@@ -185,7 +207,8 @@ router.post('/resend-verification',
 
       res.json({ message: 'A new verification code has been sent to your email.' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Resend verification error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -211,6 +234,7 @@ router.post('/resend-verification',
  *         description: Successful login
  */
 router.post('/login', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -222,6 +246,7 @@ router.post('/login',
       const user = await prisma.user.findUnique({ where: { email } });
 
       if (!user || !(await bcrypt.compare(password, user.password))) {
+        logger.warn(`Failed login attempt for email: ${email}`);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
@@ -229,15 +254,18 @@ router.post('/login',
         return res.status(403).json({ error: 'Please verify your email before logging in.' });
       }
 
+      const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
       const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET,
+        { id: user.id, email: user.email, role: user.role, isVerified: user.isVerified },
+        accessSecret,
         { expiresIn: '15m' }
       );
 
       const refreshToken = jwt.sign(
         { id: user.id },
-        process.env.JWT_SECRET,
+        refreshSecret,
         { expiresIn: '7d' }
       );
 
@@ -248,7 +276,8 @@ router.post('/login',
 
       res.json({ message: 'Login successful', accessToken, refreshToken, role: user.role });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Login error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -279,23 +308,36 @@ router.post('/refresh-token',
   async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      
+      const decoded = jwt.verify(refreshToken, refreshSecret);
       
       const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-      if (!user || user.hashedRefreshToken !== hashToken(refreshToken)) {
+      if (!user) return res.status(401).json({ error: 'Invalid or revoked refresh token' });
+
+      // Replay attack check
+      if (user.hashedRefreshToken !== hashToken(refreshToken)) {
+        logger.warn(`Token replay detected for user ${user.id}`);
+        // Invalidate all tokens for this user
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { hashedRefreshToken: null }
+        });
         return res.status(401).json({ error: 'Invalid or revoked refresh token' });
       }
 
       // Issue new token pair
+      const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+      
       const newAccessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET,
+        { id: user.id, email: user.email, role: user.role, isVerified: user.isVerified },
+        accessSecret,
         { expiresIn: '15m' }
       );
 
       const newRefreshToken = jwt.sign(
         { id: user.id },
-        process.env.JWT_SECRET,
+        refreshSecret,
         { expiresIn: '7d' }
       );
 
@@ -306,6 +348,7 @@ router.post('/refresh-token',
 
       res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
     } catch (error) {
+      logger.error('Refresh token error:', error);
       res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 });
@@ -337,7 +380,8 @@ router.post('/logout',
   async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      const decoded = jwt.verify(refreshToken, refreshSecret);
       
       await prisma.user.update({
         where: { id: decoded.id },
@@ -373,6 +417,7 @@ router.post('/logout',
  *         description: Please wait for your previous OTP to expire (5 minutes) before requesting a new one
  */
 router.post('/forgot-password', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     validate
@@ -381,7 +426,11 @@ router.post('/forgot-password',
     try {
       const { email } = req.body;
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      
+      if (!user) {
+        // Obfuscate whether user exists
+        return res.json({ message: 'If this email exists, you will receive a code.' });
+      }
 
       if (user.otpExpires && new Date() < user.otpExpires) {
         return res.status(400).json({ error: 'Please wait for your previous OTP to expire (5 minutes) before requesting a new one.' });
@@ -392,7 +441,7 @@ router.post('/forgot-password',
 
       await prisma.user.update({
         where: { email },
-        data: { otp, otpExpires }
+        data: { otp: hashOtp(otp), otpExpires }
       });
 
       // Send via SMTP
@@ -403,9 +452,10 @@ router.post('/forgot-password',
         `<h2>Password Reset Request</h2><p>Your password reset code is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
       );
 
-      res.json({ message: 'OTP sent to your email.' });
+      res.json({ message: 'If this email exists, you will receive a code.' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -435,6 +485,7 @@ router.post('/forgot-password',
  *         description: Invalid or expired OTP
  */
 router.post('/reset-password', 
+  authLimiter,
   [
     body('email').trim().isEmail().withMessage('Please provide a valid email'),
     body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
@@ -446,7 +497,12 @@ router.post('/reset-password',
       const { email, otp, newPassword } = req.body;
       const user = await prisma.user.findUnique({ where: { email } });
 
-      if (!user || user.otp !== otp || new Date() > user.otpExpires) {
+      if (!user || new Date() > user.otpExpires) {
+        return res.status(400).json({ error: 'Invalid or expired OTP' });
+      }
+
+      const providedHash = hashOtp(otp);
+      if (user.otp.length !== providedHash.length || !crypto.timingSafeEqual(Buffer.from(user.otp), Buffer.from(providedHash))) {
         return res.status(400).json({ error: 'Invalid or expired OTP' });
       }
 
@@ -458,7 +514,8 @@ router.post('/reset-password',
 
       res.json({ message: 'Password reset successfully' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Reset password error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 

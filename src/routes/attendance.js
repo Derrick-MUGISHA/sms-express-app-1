@@ -3,6 +3,7 @@ const { body, param } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const prisma = require('../config/db');
 const { authenticate, isSupervisor } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -10,7 +11,6 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Supervisor Area
- *   description: Administrative endpoints for supervisors
  */
 
 /**
@@ -52,6 +52,12 @@ router.post('/assess',
     try {
       const { studentId, courseId, status } = req.body;
 
+      const course = await prisma.course.findUnique({ where: { id: courseId } });
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      if (course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not assigned as the supervisor for this course' });
+      }
+
       const attendance = await prisma.attendance.create({
         data: {
           userId: studentId,
@@ -63,7 +69,8 @@ router.post('/assess',
 
       res.status(201).json({ message: 'Attendance marked successfully', attendance });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Assess attendance error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -92,7 +99,8 @@ router.get('/my-attendance', authenticate, async (req, res) => {
 
     res.json({ attendances });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error('Get my attendance error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -137,7 +145,8 @@ router.get('/my-attendance/:courseId',
 
       res.json({ attendances });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Get my attendance for course error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -169,6 +178,13 @@ router.get('/course/:courseId',
   async (req, res) => {
     try {
       const { courseId } = req.params;
+
+      const course = await prisma.course.findUnique({ where: { id: courseId } });
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      if (course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not assigned as the supervisor for this course' });
+      }
+
       const attendances = await prisma.attendance.findMany({
         where: { courseId },
         include: {
@@ -178,7 +194,8 @@ router.get('/course/:courseId',
       });
       res.json({ attendances });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Get course attendance error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -221,13 +238,21 @@ router.put('/:id',
     try {
       const { id } = req.params;
       const { status } = req.body;
+
+      const existingRecord = await prisma.attendance.findUnique({ where: { id }, include: { course: true } });
+      if (!existingRecord) return res.status(404).json({ error: 'Attendance record not found' });
+      if (existingRecord.course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not assigned as the supervisor for this course' });
+      }
+
       const attendance = await prisma.attendance.update({
         where: { id },
         data: { status }
       });
       res.json(attendance);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Update attendance error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -259,10 +284,18 @@ router.delete('/:id',
   async (req, res) => {
     try {
       const { id } = req.params;
+
+      const existingRecord = await prisma.attendance.findUnique({ where: { id }, include: { course: true } });
+      if (!existingRecord) return res.status(404).json({ error: 'Attendance record not found' });
+      if (existingRecord.course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not assigned as the supervisor for this course' });
+      }
+
       await prisma.attendance.delete({ where: { id } });
       res.json({ message: 'Attendance deleted successfully' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Delete attendance error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 

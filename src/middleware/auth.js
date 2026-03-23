@@ -5,7 +5,7 @@ const authenticate = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Unauthorized: No token provided' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
@@ -20,4 +20,11 @@ const isSupervisor = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, isSupervisor };
+const isVerified = (req, res, next) => {
+  if (req.user.role === 'SUPERVISOR' || req.user.isVerified) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Forbidden: Please verify your email to access this resource.' });
+};
+
+module.exports = { authenticate, isSupervisor, isVerified };
