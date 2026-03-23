@@ -3,6 +3,7 @@ const { body, param } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const prisma = require('../config/db');
 const { authenticate, isSupervisor } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -51,10 +52,17 @@ router.post('/',
   async (req, res) => {
     try {
       const { courseName, description } = req.body;
-      const course = await prisma.course.create({ data: { courseName, description } });
+      const course = await prisma.course.create({ 
+        data: { 
+          courseName, 
+          description,
+          supervisorId: req.user.id 
+        } 
+      });
       res.status(201).json(course);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Create course error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -75,7 +83,8 @@ router.get('/', authenticate, async (req, res) => {
     const courses = await prisma.course.findMany();
     res.json(courses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error('Get courses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -112,7 +121,8 @@ router.get('/:id',
       if (!course) return res.status(404).json({ error: 'Course not found' });
       res.json(course);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Get course error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -153,13 +163,22 @@ router.put('/:id',
     try {
       const { id } = req.params;
       const { courseName, description } = req.body;
-      const course = await prisma.course.update({
+      
+      const course = await prisma.course.findUnique({ where: { id } });
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      
+      if (course.supervisorId && course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this course' });
+      }
+
+      const updatedCourse = await prisma.course.update({
         where: { id },
         data: { courseName, description },
       });
-      res.json(course);
+      res.json(updatedCourse);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Update course error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -191,10 +210,19 @@ router.delete('/:id',
   async (req, res) => {
     try {
       const { id } = req.params;
+      
+      const course = await prisma.course.findUnique({ where: { id } });
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      
+      if (course.supervisorId && course.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this course' });
+      }
+
       await prisma.course.delete({ where: { id } });
       res.json({ message: 'Course deleted successfully' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Delete course error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 

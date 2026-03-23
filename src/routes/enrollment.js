@@ -2,7 +2,8 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const prisma = require('../config/db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, isVerified } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ const router = express.Router();
  */
 router.post('/:courseId', 
   authenticate, 
+  isVerified,
   [
     param('courseId').isMongoId().withMessage('Invalid course ID format'),
     validate
@@ -56,7 +58,8 @@ router.post('/:courseId',
       if (error.code === 'P2002') {
         return res.status(400).json({ error: 'You are already enrolled in this course' });
       }
-      res.status(500).json({ error: error.message });
+      logger.error('Enrollment error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -72,7 +75,7 @@ router.post('/:courseId',
  *       200:
  *         description: List of enrolled courses
  */
-router.get('/my-enrollments', authenticate, async (req, res) => {
+router.get('/my-enrollments', authenticate, isVerified, async (req, res) => {
   try {
     const enrollments = await prisma.enrollment.findMany({
       where: { userId: req.user.id },
@@ -82,7 +85,8 @@ router.get('/my-enrollments', authenticate, async (req, res) => {
     });
     res.json({ enrollments });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error('Get enrollments error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -106,6 +110,7 @@ router.get('/my-enrollments', authenticate, async (req, res) => {
  */
 router.delete('/:courseId', 
   authenticate,
+  isVerified,
   [
     param('courseId').isMongoId().withMessage('Invalid course ID format'),
     validate
@@ -131,7 +136,8 @@ router.delete('/:courseId',
       
       res.json({ message: 'Successfully unenrolled' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Unenroll error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 

@@ -1,8 +1,10 @@
 const express = require('express');
 const { body, param } = require('express-validator');
+const bcrypt = require('bcrypt');
 const { validate } = require('../middleware/validate');
 const prisma = require('../config/db');
-const { authenticate, isSupervisor } = require('../middleware/auth');
+const { authenticate, isSupervisor, isVerified } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -18,7 +20,7 @@ const router = express.Router();
  *       200:
  *         description: User profile data
  */
-router.get('/me', authenticate, async (req, res) => {
+router.get('/me', authenticate, isVerified, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -34,7 +36,8 @@ router.get('/me', authenticate, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error('Get profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -61,6 +64,7 @@ router.get('/me', authenticate, async (req, res) => {
  */
 router.put('/me', 
   authenticate,
+  isVerified,
   [
     body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
     validate
@@ -69,8 +73,8 @@ router.put('/me',
     try {
       const { password } = req.body;
       let updateData = {};
+      
       if (password) {
-        const bcrypt = require('bcrypt');
         updateData.password = await bcrypt.hash(password, 10);
       }
       
@@ -90,7 +94,8 @@ router.put('/me',
       });
       res.json({ message: 'Profile updated successfully', user });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Update profile error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -119,7 +124,8 @@ router.get('/', authenticate, isSupervisor, async (req, res) => {
     });
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error('List users error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -151,14 +157,25 @@ router.delete('/:id',
   async (req, res) => {
     try {
       const { id } = req.params;
-      // Don't allow supervisors to delete themselves here
+      
       if (id === req.user.id) {
         return res.status(400).json({ error: 'Cannot delete your own account' });
       }
+
+      const targetUser = await prisma.user.findUnique({ where: { id } });
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (targetUser.role === 'SUPERVISOR') {
+        return res.status(403).json({ error: 'Supervisors cannot delete other supervisors' });
+      }
+
       await prisma.user.delete({ where: { id } });
       res.json({ message: 'User deleted successfully' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logger.error('Delete user error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
 });
 

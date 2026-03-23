@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -25,20 +24,23 @@ model User {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  enrollments Enrollment[]
-  attendances Attendance[] @relation("StudentAttendance")
-  supervisor  Attendance[] @relation("SupervisorAttendance")
+  enrollments        Enrollment[]
+  attendances        Attendance[] @relation("StudentAttendance")
+  supervisorRecords  Attendance[] @relation("SupervisorAttendance")
+  supervisedCourses  Course[]     @relation("CourseSupervisor")
 }
 
 model Course {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  courseName  String
-  description String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseName   String
+  description  String
+  supervisorId String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  enrollments Enrollment[]
-  attendances Attendance[]
+  supervisor   User?    @relation("CourseSupervisor", fields: [supervisorId], references: [id])
+  enrollments  Enrollment[]
+  attendances  Attendance[]
 }
 
 model Enrollment {
