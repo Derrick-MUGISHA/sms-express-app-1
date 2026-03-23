@@ -40,10 +40,7 @@ app.use(globalLimiter);
 
 app.use(express.json({ limit: '10kb' }));
 
-app.use(cors({
-  origin: true,   // reflect request origin
-  credentials: true
-}));
+app.use(cors());
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
