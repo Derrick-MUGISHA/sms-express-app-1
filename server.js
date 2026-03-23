@@ -22,6 +22,7 @@ const courseRoutes = require('./src/routes/course');
 const attendanceRoutes = require('./src/routes/attendance');
 const enrollmentRoutes = require('./src/routes/enrollment');
 const userRoutes = require('./src/routes/user');
+const storyRoutes = require('./src/routes/story');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/stories', storyRoutes);
 
 // Initialize Swagger
 if (process.env.NODE_ENV !== 'production') {
