@@ -23,7 +23,10 @@ const storyRoutes = require('./src/routes/story');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Global Rate Limiter
 const globalLimiter = rateLimit({
@@ -48,9 +51,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/stories', storyRoutes);
 
 // Initialize Swagger
-if (process.env.NODE_ENV !== 'production') {
-  swaggerDocs(app);
-}
+// if (process.env.NODE_ENV !== 'production') {
+//   swaggerDocs(app);
+// }
 
 // Handle JSON SyntaxErrors to return a friendly JSON message instead of HTML
 app.use((err, req, res, next) => {
