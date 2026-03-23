@@ -7,14 +7,14 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const adminEmail = 'admin@example.com';
-  const adminPassword = 'adminpassword123';
+  const adminEmail = process.env.SUPERVISOR_EMAIL || 'admin@example.com';
+  const adminPassword = process.env.SUPERVISOR_PASSWORD || 'adminpassword123';
 
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail }
+  const existingSupervisor = await prisma.user.findFirst({
+    where: { role: 'SUPERVISOR' }
   });
 
-  if (!existingAdmin) {
+  if (!existingSupervisor) {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const admin = await prisma.user.create({
       data: {
@@ -28,7 +28,7 @@ async function main() {
       Email: ${admin.email}
       Password: ${adminPassword}`);
   } else {
-    console.log(`ℹ️ Supervisor account already exists: ${existingAdmin.email}`);
+    console.log(`ℹ️ Supervisor account already exists: ${existingSupervisor.email}`);
   }
 }
 

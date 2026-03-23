@@ -13,4 +13,6 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+      - SUPERVISOR_EMAIL=${SUPERVISOR_EMAIL}
+      - SUPERVISOR_PASSWORD=${SUPERVISOR_PASSWORD}
     restart: unless-stopped
