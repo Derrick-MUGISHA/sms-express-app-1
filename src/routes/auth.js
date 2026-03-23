@@ -38,7 +38,7 @@ const hashToken = (token) => crypto.createHash('sha256').update(token).digest('h
  *                 type: string
  *     responses:
  *       201:
- *         description: User registered successfully
+ *         description: User registered successfully. OTP sent via email (expires in 5 minutes).
  */
 router.post('/register', 
   [
@@ -54,7 +54,7 @@ router.post('/register',
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const otp = crypto.randomInt(100000, 999999).toString();
-      const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+      const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
       
       const user = await prisma.user.create({
         data: { 
@@ -72,7 +72,7 @@ router.post('/register',
         email, 
         'Verify your SMS Express Account', 
         `Your verification code is: ${otp}`,
-        `<h2>Welcome to SMS Express</h2><p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 15 minutes.</p>`
+        `<h2>Welcome to SMS Express</h2><p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
       );
 
       res.status(201).json({ message: 'User registered. Please check your email for the verification code.', userId: user.id });
@@ -101,6 +101,8 @@ router.post('/register',
  *     responses:
  *       200:
  *         description: Email verified
+ *       400:
+ *         description: Invalid or expired OTP
  */
 router.post('/verify-email', 
   [
@@ -123,6 +125,65 @@ router.post('/verify-email',
       });
 
       res.json({ message: 'Email verified successfully. You can now log in.' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification OTP
+ *     tags: [Shared / Public]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP resent (expires in 5 minutes)
+ *       400:
+ *         description: Please wait for your previous OTP to expire (5 minutes) before requesting a new one
+ */
+router.post('/resend-verification', 
+  [
+    body('email').trim().isEmail().withMessage('Please provide a valid email'),
+    validate
+  ],
+  async (req, res) => {
+    try {
+      const { email } = req.body;
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (user.isVerified) return res.status(400).json({ error: 'User is already verified' });
+
+      if (user.otpExpires && new Date() < user.otpExpires) {
+        return res.status(400).json({ error: 'Please wait for your previous OTP to expire (5 minutes) before requesting a new one.' });
+      }
+
+      const otp = crypto.randomInt(100000, 999999).toString();
+      const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+
+      await prisma.user.update({
+        where: { email },
+        data: { otp, otpExpires }
+      });
+
+      await sendEmail(
+        email, 
+        'Verify your SMS Express Account', 
+        `Your verification code is: ${otp}`,
+        `<h2>Welcome to SMS Express</h2><p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
+      );
+
+      res.json({ message: 'A new verification code has been sent to your email.' });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -307,7 +368,9 @@ router.post('/logout',
  *                 type: string
  *     responses:
  *       200:
- *         description: OTP generated
+ *         description: OTP generated (expires in 5 minutes)
+ *       400:
+ *         description: Please wait for your previous OTP to expire (5 minutes) before requesting a new one
  */
 router.post('/forgot-password', 
   [
@@ -320,8 +383,12 @@ router.post('/forgot-password',
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) return res.status(404).json({ error: 'User not found' });
 
+      if (user.otpExpires && new Date() < user.otpExpires) {
+        return res.status(400).json({ error: 'Please wait for your previous OTP to expire (5 minutes) before requesting a new one.' });
+      }
+
       const otp = crypto.randomInt(100000, 999999).toString();
-      const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+      const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
       await prisma.user.update({
         where: { email },
@@ -333,7 +400,7 @@ router.post('/forgot-password',
         email, 
         'Reset Password - SMS Express', 
         `Your password reset code is: ${otp}`,
-        `<h2>Password Reset Request</h2><p>Your password reset code is: <strong>${otp}</strong></p><p>This code expires in 15 minutes.</p>`
+        `<h2>Password Reset Request</h2><p>Your password reset code is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
       );
 
       res.json({ message: 'OTP sent to your email.' });
@@ -364,6 +431,8 @@ router.post('/forgot-password',
  *     responses:
  *       200:
  *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired OTP
  */
 router.post('/reset-password', 
   [
