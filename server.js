@@ -9,10 +9,7 @@ if (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET) {
   process.exit(1);
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
-  console.error("CRITICAL ERROR: ALLOWED_ORIGINS must be defined in production environment.");
-  process.exit(1);
-}
+
 
 // Import Swagger
 const swaggerDocs = require('./swagger');
