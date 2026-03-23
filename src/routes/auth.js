@@ -254,8 +254,8 @@ router.post('/login',
         return res.status(403).json({ error: 'Please verify your email before logging in.' });
       }
 
-      const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
-      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      const accessSecret = process.env.JWT_ACCESS_SECRET;
+      const refreshSecret = process.env.JWT_REFRESH_SECRET;
 
       const accessToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role, isVerified: user.isVerified },
@@ -308,7 +308,7 @@ router.post('/refresh-token',
   async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      const refreshSecret = process.env.JWT_REFRESH_SECRET;
       
       const decoded = jwt.verify(refreshToken, refreshSecret);
       
@@ -327,7 +327,7 @@ router.post('/refresh-token',
       }
 
       // Issue new token pair
-      const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+      const accessSecret = process.env.JWT_ACCESS_SECRET;
       
       const newAccessToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role, isVerified: user.isVerified },
@@ -380,7 +380,7 @@ router.post('/logout',
   async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      const refreshSecret = process.env.JWT_REFRESH_SECRET;
       const decoded = jwt.verify(refreshToken, refreshSecret);
       
       await prisma.user.update({
@@ -429,6 +429,7 @@ router.post('/forgot-password',
       
       if (!user) {
         // Obfuscate whether user exists
+        await new Promise(resolve => setTimeout(resolve, 200));
         return res.json({ message: 'If this email exists, you will receive a code.' });
       }
 
