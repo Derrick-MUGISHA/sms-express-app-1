@@ -55,6 +55,8 @@ app.use('/api/stories', storyRoutes);
 //   swaggerDocs(app);
 // }
 
+swaggerDocs(app);
+
 // Handle JSON SyntaxErrors to return a friendly JSON message instead of HTML
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
