@@ -23,9 +23,20 @@ const storyRoutes = require('./src/routes/story');
 
 const app = express();
 
+// CORS configuration - allow all origins
+app.use(cors({
+  origin: '*',
+  methods: '*',
+  allowedHeaders: '*',
+  exposedHeaders: '*',
+  credentials: false
+}));
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false,
 }));
 
 // Global Rate Limiter
@@ -39,8 +50,6 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 
 app.use(express.json({ limit: '10kb' }));
-
-app.use(cors());
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
