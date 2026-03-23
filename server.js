@@ -4,6 +4,16 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
+if (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET) {
+  console.error("CRITICAL ERROR: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be defined in the environment.");
+  process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+  console.error("CRITICAL ERROR: ALLOWED_ORIGINS must be defined in production environment.");
+  process.exit(1);
+}
+
 // Import Swagger
 const swaggerDocs = require('./swagger');
 
@@ -29,7 +39,7 @@ app.use(globalLimiter);
 
 app.use(express.json({ limit: '10kb' }));
 
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || true, credentials: true }));
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:3000', credentials: true }));
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
@@ -51,7 +61,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

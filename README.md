@@ -61,8 +61,12 @@ Create a `.env` file in the root directory and provide the necessary variables r
 # Database Configuration
 DATABASE_URL="mongodb+srv://<username>:<password>@cluster0.db.net/SMS?appName=Cluster"
 
-# JWT Token Secret
-JWT_SECRET="your_secret_string"
+# JWT Token Secrets
+JWT_ACCESS_SECRET="your_access_secret_string"
+JWT_REFRESH_SECRET="your_refresh_secret_string"
+
+# Allowed CORS Origins
+ALLOWED_ORIGINS="http://localhost:3000,http://yourdomain.com"
 
 # Application Port
 PORT=3000
