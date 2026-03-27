@@ -20,6 +20,7 @@ const attendanceRoutes = require('./src/routes/attendance');
 const enrollmentRoutes = require('./src/routes/enrollment');
 const userRoutes = require('./src/routes/user');
 const storyRoutes = require('./src/routes/story');
+const vehicleServiceRoutes = require('./src/routes/vehicleService');
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/stories', storyRoutes);
+app.use('/api/vehicle-service', vehicleServiceRoutes);
 
 // Initialize Swagger
 // if (process.env.NODE_ENV !== 'production') {

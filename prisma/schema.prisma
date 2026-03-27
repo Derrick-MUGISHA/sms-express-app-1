@@ -12,22 +12,103 @@ enum Role {
   SUPERVISOR
 }
 
+enum VehicleType {
+  SEDAN
+  SUV
+  TRUCK
+  MOTORCYCLE
+  BUS
+  VAN
+  PICKUP
+  OTHER
+}
+
+enum BodyType {
+  HATCHBACK
+  SEDAN
+  COUPE
+  CONVERTIBLE
+  WAGON
+  SUV
+  PICKUP
+  VAN
+  OTHER
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+  GAS
+  OTHER
+}
+
+enum VehiclePurpose {
+  PERSONAL
+  COMMERCIAL
+  TAXI
+  GOVERNMENT
+}
+
+enum VehicleStatus {
+  NEW
+  USED
+  REBUILT
+}
+
+enum OwnerType {
+  INDIVIDUAL
+  COMPANY
+  NGO
+  GOVERNMENT
+}
+
+enum RegistrationStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  PENDING
+}
+
+enum PlateType {
+  PRIVATE
+  COMMERCIAL
+  GOVERNMENT
+  DIPLOMATIC
+  PERSONALIZED
+}
+
+enum InsuranceStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum InsuranceType {
+  THIRD_PARTY
+  COMPREHENSIVE
+  THIRD_PARTY_FIRE_AND_THEFT
+  COMPREHENSIVE_FIRE_AND_THEFT
+  OTHER
+}
+
 model User {
-  id                 String       @id @default(auto()) @map("_id") @db.ObjectId
-  email              String       @unique
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  email              String    @unique
   password           String
-  role               Role         @default(STUDENT)
-  isVerified         Boolean      @default(false)
+  role               Role      @default(STUDENT)
+  isVerified         Boolean   @default(false)
   otp                String?
   otpExpires         DateTime?
   hashedRefreshToken String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  enrollments        Enrollment[]
-  attendances        Attendance[] @relation("StudentAttendance")
-  supervisorRecords  Attendance[] @relation("SupervisorAttendance")
-  supervisedCourses  Course[]     @relation("CourseSupervisor")
+  enrollments       Enrollment[]
+  attendances       Attendance[] @relation("StudentAttendance")
+  supervisorRecords Attendance[] @relation("SupervisorAttendance")
+  supervisedCourses Course[]     @relation("CourseSupervisor")
 }
 
 model Course {
@@ -38,15 +119,15 @@ model Course {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  supervisor   User?    @relation("CourseSupervisor", fields: [supervisorId], references: [id])
-  enrollments  Enrollment[]
-  attendances  Attendance[]
+  supervisor  User?        @relation("CourseSupervisor", fields: [supervisorId], references: [id])
+  enrollments Enrollment[]
+  attendances Attendance[]
 }
 
 model Enrollment {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
-  courseId   String   @db.ObjectId
+  courseId  String   @db.ObjectId
   createdAt DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
@@ -58,10 +139,10 @@ model Enrollment {
 model Attendance {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   userId       String   @db.ObjectId
-  courseId      String   @db.ObjectId
+  courseId     String   @db.ObjectId
   supervisorId String   @db.ObjectId
   date         DateTime @default(now())
-  status       Boolean  
+  status       Boolean
 
   student    User   @relation("StudentAttendance", fields: [userId], references: [id])
   course     Course @relation(fields: [courseId], references: [id])
@@ -69,9 +150,60 @@ model Attendance {
 }
 
 model Story {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  authorName  String
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  authorName String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Vehicle {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  vin             String         @unique
+  engineNumber    String         @unique
+  make            String
+  model           String
+  year            Int
+  vehicleType     VehicleType
+  bodyType        BodyType
+  color           String
+  fuelType        FuelType
+  engineCapacity  Int
+  odometerReading Int
+  seatingCapacity Int
+  vehiclePurpose  VehiclePurpose
+  vehicleStatus   VehicleStatus
+
+  ownerId          String    @db.ObjectId
+  ownerName        String
+  ownerType        OwnerType
+  tin              String?
+  nationalId       String?
+  passportNumber   String?
+  companyRegNumber String?
+  address          String
+  mobile           String
+  email            String
+
+  registrationId     String?             @db.ObjectId
+  plateNumber        String?
+  registrationStatus RegistrationStatus?
+  registrationDate   DateTime?
+  expiryDate         DateTime?
+  state              String?
+  plateType          PlateType?
+
+  insuranceId         String?          @db.ObjectId
+  policyNumber        String?
+  companyName         String?
+  insuranceExpiryDate DateTime?
+  insuranceStatus     InsuranceStatus?
+  insuranceType       InsuranceType?
+  roadworthyCert      String?
+  customsRef          String?
+  proofOfOwnership    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
