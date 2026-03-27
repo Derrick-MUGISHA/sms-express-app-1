@@ -13,25 +13,13 @@ enum Role {
 }
 
 enum VehicleType {
-  SEDAN
+  ELECTRIC
   SUV
   TRUCK
   MOTORCYCLE
   BUS
   VAN
   PICKUP
-  OTHER
-}
-
-enum BodyType {
-  HATCHBACK
-  SEDAN
-  COUPE
-  CONVERTIBLE
-  WAGON
-  SUV
-  PICKUP
-  VAN
   OTHER
 }
 
@@ -83,14 +71,6 @@ enum InsuranceStatus {
   ACTIVE
   EXPIRED
   CANCELLED
-}
-
-enum InsuranceType {
-  THIRD_PARTY
-  COMPREHENSIVE
-  THIRD_PARTY_FIRE_AND_THEFT
-  COMPREHENSIVE_FIRE_AND_THEFT
-  OTHER
 }
 
 model User {
@@ -160,13 +140,11 @@ model Story {
 model Vehicle {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  vin             String         @unique
-  engineNumber    String         @unique
-  make            String
+  manufacture     String
   model           String
   year            Int
   vehicleType     VehicleType
-  bodyType        BodyType
+  bodyType        String
   color           String
   fuelType        FuelType
   engineCapacity  Int
@@ -175,34 +153,30 @@ model Vehicle {
   vehiclePurpose  VehiclePurpose
   vehicleStatus   VehicleStatus
 
-  ownerId          String    @db.ObjectId
   ownerName        String
   ownerType        OwnerType
-  tin              String?
-  nationalId       String?
-  passportNumber   String?
-  companyRegNumber String?
+  nationalId       String
+  passportNumber   String
+  companyRegNumber String
   address          String
   mobile           String
   email            String
 
-  registrationId     String?             @db.ObjectId
-  plateNumber        String?
+  plateNumber        String?             @unique
   registrationStatus RegistrationStatus?
-  registrationDate   DateTime?
-  expiryDate         DateTime?
-  state              String?
-  plateType          PlateType?
+  registrationDate   DateTime
+  expiryDate         DateTime
+  state              String
+  plateType          PlateType
 
-  insuranceId         String?          @db.ObjectId
-  policyNumber        String?
-  companyName         String?
-  insuranceExpiryDate DateTime?
+  policyNumber        String
+  companyName         String
+  insuranceExpiryDate DateTime
   insuranceStatus     InsuranceStatus?
-  insuranceType       InsuranceType?
-  roadworthyCert      String?
-  customsRef          String?
-  proofOfOwnership    String?
+  insuranceType       String
+  roadworthyCert      String
+  customsRef          String
+  proofOfOwnership    String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
