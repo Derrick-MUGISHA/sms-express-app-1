@@ -78,7 +78,7 @@ router.post('/',
  *       200:
  *         description: List of all courses
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, isSupervisor, async (req, res) => {
   try {
     const courses = await prisma.course.findMany();
     res.json(courses);
@@ -109,7 +109,8 @@ router.get('/', authenticate, async (req, res) => {
  *         description: Course not found
  */
 router.get('/:id', 
-  authenticate, 
+  authenticate,
+  isSupervisor, 
   [
     param('id').isMongoId().withMessage('Invalid course ID format'),
     validate
