@@ -24,9 +24,14 @@ const vehicleServiceRoutes = require('./src/routes/vehicleService');
 
 const app = express();
 
-// CORS configuration - allow all origins
+app.set('trust proxy', 1);
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : '*';
+
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigins,
   methods: '*',
   allowedHeaders: '*',
   exposedHeaders: '*',
