@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   STUDENT
   SUPERVISOR
+  USER
 }
 
 enum VehicleType {
