@@ -71,7 +71,97 @@ router.post('/',
   }
 );
 
-// ─── List ─────────────────────────────────────────────────────────────────────
+// ─── Supervisor — own courses with cohort stats ───────────────────────────────
+
+/**
+ * @swagger
+ * /api/courses/my-courses:
+ *   get:
+ *     summary: Get supervisor's courses with enrollment and attendance statistics (Supervisor only)
+ *     description: Returns each course the supervisor owns, along with total enrolled students, total attendance sessions, and overall attendance rate.
+ *     tags: [Supervisor Area]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of supervised courses with cohort statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 courses:
+ *                   type: array
+ *                   items:
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/CourseResponse'
+ *                       - type: object
+ *                         properties:
+ *                           enrolledCount:
+ *                             type: integer
+ *                             example: 30
+ *                           totalAttendanceSessions:
+ *                             type: integer
+ *                             example: 120
+ *                           presentCount:
+ *                             type: integer
+ *                             example: 90
+ *                           absentCount:
+ *                             type: integer
+ *                             example: 30
+ *                           overallAttendanceRate:
+ *                             type: number
+ *                             format: float
+ *                             example: 75.0
+ *       401:
+ *         description: Missing or invalid access token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Supervisor role required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/my-courses', authenticate, isSupervisor, async (req, res) => {
+  try {
+    const rawCourses = await prisma.course.findMany({
+      where: { supervisorId: req.user.id },
+      include: {
+        enrollments: { select: { id: true } },
+        attendances: { select: { status: true } },
+      },
+    });
+
+    const courses = rawCourses.map(course => {
+      const total = course.attendances.length;
+      const present = course.attendances.filter(a => a.status).length;
+      return {
+        id: course.id,
+        courseName: course.courseName,
+        description: course.description,
+        supervisorId: course.supervisorId,
+        createdAt: course.createdAt,
+        updatedAt: course.updatedAt,
+        enrolledCount: course.enrollments.length,
+        totalAttendanceSessions: total,
+        presentCount: present,
+        absentCount: total - present,
+        overallAttendanceRate: total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : 0,
+      };
+    });
+
+    res.json({ courses });
+  } catch (error) {
+    logger.error('Get my courses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── List all courses ─────────────────────────────────────────────────────────
 
 /**
  * @swagger

@@ -13,6 +13,20 @@ enum Role {
   USER
 }
 
+enum MarkType {
+  ASSIGNMENT
+  QUIZ
+  EXAM
+  PROJECT
+  PARTICIPATION
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum VehicleType {
   ELECTRIC
   SUV
@@ -87,9 +101,13 @@ model User {
   updatedAt          DateTime  @updatedAt
 
   enrollments       Enrollment[]
-  attendances       Attendance[] @relation("StudentAttendance")
-  supervisorRecords Attendance[] @relation("SupervisorAttendance")
-  supervisedCourses Course[]     @relation("CourseSupervisor")
+  attendances       Attendance[]      @relation("StudentAttendance")
+  supervisorRecords Attendance[]      @relation("SupervisorAttendance")
+  supervisedCourses Course[]          @relation("CourseSupervisor")
+  studentMarks      Mark[]            @relation("StudentMarks")
+  supervisorMarks   Mark[]            @relation("SupervisorMarks")
+  studentClaims     AttendanceClaim[] @relation("StudentClaims")
+  resolvedClaims    AttendanceClaim[] @relation("ResolvedClaims")
 }
 
 model Course {
@@ -100,9 +118,11 @@ model Course {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  supervisor  User?        @relation("CourseSupervisor", fields: [supervisorId], references: [id])
+  supervisor  User?             @relation("CourseSupervisor", fields: [supervisorId], references: [id])
   enrollments Enrollment[]
   attendances Attendance[]
+  marks       Mark[]
+  claims      AttendanceClaim[]
 }
 
 model Enrollment {
@@ -128,6 +148,41 @@ model Attendance {
   student    User   @relation("StudentAttendance", fields: [userId], references: [id])
   course     Course @relation(fields: [courseId], references: [id])
   supervisor User   @relation("SupervisorAttendance", fields: [supervisorId], references: [id])
+}
+
+model Mark {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  courseId     String   @db.ObjectId
+  supervisorId String   @db.ObjectId
+  title        String
+  score        Float
+  maxScore     Float
+  type         MarkType @default(ASSIGNMENT)
+  feedback     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student    User   @relation("StudentMarks", fields: [userId], references: [id])
+  course     Course @relation(fields: [courseId], references: [id])
+  supervisor User   @relation("SupervisorMarks", fields: [supervisorId], references: [id])
+}
+
+model AttendanceClaim {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String      @db.ObjectId
+  courseId   String      @db.ObjectId
+  date       DateTime
+  reason     String
+  status     ClaimStatus @default(PENDING)
+  resolvedBy String?     @db.ObjectId
+  resolution String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  student  User    @relation("StudentClaims", fields: [userId], references: [id])
+  course   Course  @relation(fields: [courseId], references: [id])
+  resolver User?   @relation("ResolvedClaims", fields: [resolvedBy], references: [id])
 }
 
 model Story {

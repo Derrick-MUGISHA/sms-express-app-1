@@ -20,6 +20,7 @@ const enrollmentRoutes = require('./src/routes/enrollment');
 const userRoutes = require('./src/routes/user');
 const storyRoutes = require('./src/routes/story');
 const vehicleServiceRoutes = require('./src/routes/vehicleService');
+const marksRoutes = require('./src/routes/marks');
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/vehicle-service', vehicleServiceRoutes);
+app.use('/api/marks', marksRoutes);
 
 swaggerDocs(app);
 
